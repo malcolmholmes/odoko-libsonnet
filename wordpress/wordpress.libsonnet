@@ -93,4 +93,9 @@ local k = import 'ksonnet-util/kausal.libsonnet';
       ])
       ,
   },
+
+  withNodeSelector(selector):: {
+    statefulset+: statefulset.mixin.spec.template.spec.withNodeSelector(selector)
+  },
+
 }
