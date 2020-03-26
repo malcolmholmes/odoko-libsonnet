@@ -3,11 +3,13 @@ local k = import 'ksonnet-util/kausal.libsonnet';
 {
   local ingress = k.extensions.v1beta1.ingress,
 
-  withIngress(extraDomains=[]):: {
+  withIngress(domains=[], extraDomains=[]):: {
 
     local name = super.config.name,
-    local domain = super.config.domain,
-    local root = 'www.%s' % domain,
+    local domainlist = (if std.length(domains) == 0 then
+      [ super.config.domain, 'www.%s' % super.config.domain]
+      else domains
+      ) + extraDomains,
 
     local rule(dom) = ingress.mixin.specType.rulesType.mixin.http.withPaths(
            ingress.mixin.spec.rulesType.mixin.httpType.pathsType.withPath('/')
@@ -18,7 +20,7 @@ local k = import 'ksonnet-util/kausal.libsonnet';
 
     ingress: ingress.new()
       + ingress.mixin.metadata.withName(name)
-      + ingress.mixin.spec.withTls({hosts:[ domain, root] + extraDomains, secretName: name})
+      + ingress.mixin.spec.withTls({hosts: domainlist, secretName: name})
       + ingress.mixin.metadata.withAnnotationsMixin({
         'kubernetes.io/tls-acme': 'true',
         'kubernetes.io/ingress.class': 'nginx',
@@ -26,10 +28,9 @@ local k = import 'ksonnet-util/kausal.libsonnet';
       })
       + ingress.mixin.spec.backend.mixinInstance({serviceName: name, servicePort: 80})
       + ingress.mixin.spec.withRules(
-          [rule(domain), rule(root)]
-        + [
+          [
           rule(dom)
-          for dom in extraDomains
+          for dom in domainlist
           ]
         )
       ,
