@@ -2,14 +2,12 @@ package main
 
 import (
 	"context"
-	"flag"
 	"fmt"
 	"io/ioutil"
 	"log"
 	"net"
 	"net/http"
 	"os"
-	"path/filepath"
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
@@ -18,7 +16,7 @@ import (
 	"google.golang.org/api/dns/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
-	"k8s.io/client-go/tools/clientcmd"
+	"k8s.io/client-go/rest"
 )
 
 var (
@@ -96,21 +94,11 @@ func loop(googleProject string, clientset *kubernetes.Clientset, dnsService *dns
 }
 
 func getK8sClientSet() *kubernetes.Clientset {
-	var kubeconfig *string
-	if home := os.Getenv("HOME"); home != "" {
-		kubeconfig = flag.String("kubeconfig", filepath.Join(home, ".kube", "config"), "(optional) absolute path to the kubeconfig file")
-	} else {
-		kubeconfig = flag.String("kubeconfig", "", "absolute path to the kubeconfig file")
-	}
-	flag.Parse()
 
-	// use the current context in kubeconfig
-	config, err := clientcmd.BuildConfigFromFlags("", *kubeconfig)
+	config, err := rest.InClusterConfig()
 	if err != nil {
 		panic(err.Error())
 	}
-
-	// create the clientset
 	clientset, err := kubernetes.NewForConfig(config)
 	if err != nil {
 		panic(err.Error())
