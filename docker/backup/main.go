@@ -3,24 +3,8 @@ package main
 import (
 	"log"
 	"os"
+	"strconv"
 	"strings"
-
-	"github.com/prometheus/client_golang/prometheus"
-	"github.com/prometheus/client_golang/prometheus/promauto"
-)
-
-var (
-	ingressCount = promauto.NewGauge(prometheus.GaugeOpts{
-		Name: "dyndns_ingress_count",
-		Help: "The number ingresses found",
-	})
-	domainsChecked = promauto.NewCounterVec(
-		prometheus.CounterOpts{
-			Name: "dyndns_domains_checked_total",
-			Help: "The total number of domains checked",
-		},
-		[]string{"domain"},
-	)
 )
 
 func contains(s []string, e string) bool {
@@ -40,11 +24,25 @@ func main() {
 	dbUser := os.Getenv("DB_USER")
 	dbPass := os.Getenv("DB_PASS")
 	bucket := os.Getenv("BUCKET")
+	backupPath := os.Getenv("BACKUP_PATH")
+	newerThanSeconds, err := strconv.Atoi(os.Getenv("NEWER_THAN_SECONDS"))
+	if err != nil {
+		log.Printf("Skipping: %v", err)
+		newerThanSeconds = 0
+	}
 
 	log.Println("Executing commands", cmds)
 	if contains(cmds, "backup-db") {
 		log.Println("Backing up db")
 		err := backupMysql(dbHost, dbName, dbUser, dbPass, bucket)
+		if err != nil {
+			panic(err)
+		}
+	}
+
+	if contains(cmds, "backup-file") {
+		log.Println("Backing up file")
+		err := backupFile(dbName, backupPath, bucket, newerThanSeconds)
 		if err != nil {
 			panic(err)
 		}
@@ -75,7 +73,7 @@ func main() {
 	}
 
 	if contains(cmds, "restore-db") {
-		log.Println("Backing up uploads")
+		log.Println("Restoring db")
 		fromEnv := os.Getenv("FROM_ENV")
 		domain := os.Getenv("DOMAIN")
 		replaceDomains := strings.Split(os.Getenv("REPLACE"), ",")
@@ -83,7 +81,6 @@ func main() {
 		if err != nil {
 			panic(err)
 		}
-
 	}
 
 	if contains(cmds, "restore-uploads") {

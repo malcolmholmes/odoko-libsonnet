@@ -14,6 +14,6 @@ COPY . .
 RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o backup ./
 
 FROM alpine:3.10
-RUN apk add mysql-client
+RUN apk add mysql-client postgresql-client
 COPY --from=builder /app/backup /app/
 ENTRYPOINT ["/app/backup"]
