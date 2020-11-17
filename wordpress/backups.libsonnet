@@ -40,6 +40,8 @@ local k = import 'ksonnet-util/kausal.libsonnet';
     backup_cron: cronjob.new()
       + cronjob.mixin.metadata.withName('%s-backup' % super.config.name)
       + cronjob.mixin.spec.withSchedule('0 0 * * *')
+      + cronjob.mixin.spec.withSuccessfulJobsHistoryLimit(1)
+      + cronjob.mixin.spec.withFailedJobsHistoryLimit(1)
       + cronjob.mixin.spec.jobTemplate.spec.template.spec.withContainers([backup_container])
       + cronjob.mixin.spec.jobTemplate.spec.template.spec.withRestartPolicy('OnFailure')
       + cronjob.mixin.spec.jobTemplate.spec.template.spec.withVolumes(volumes(super.config.name))
@@ -54,6 +56,8 @@ local k = import 'ksonnet-util/kausal.libsonnet';
     restore_job: cronjob.new()
       + cronjob.mixin.metadata.withName('%s-restore' % super.config.name)
       + cronjob.mixin.spec.withSchedule('0 0 31 2 *') // i.e. never. will be run manually
+      + cronjob.mixin.spec.withSuccessfulJobsHistoryLimit(1)
+      + cronjob.mixin.spec.withFailedJobsHistoryLimit(1)
       + cronjob.mixin.spec.jobTemplate.spec.template.spec.withContainers([restore_container])
       + cronjob.mixin.spec.jobTemplate.spec.template.spec.withRestartPolicy('Never')
       + cronjob.mixin.spec.jobTemplate.spec.template.spec.withVolumes(volumes(super.config.name))
