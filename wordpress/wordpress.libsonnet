@@ -1,14 +1,15 @@
 local k = import 'ksonnet-util/kausal.libsonnet';
 
 {
-  _images+:: {
-    wordpress: 'odoko/wordpress',
-  },
-
   local volume = k.core.v1.volume,
   local mount = k.core.v1.volumeMount,
   local statefulset = k.apps.v1.statefulSet,
   local container = k.core.v1.container,
+
+  _images+:: {
+    wordpress: 'odoko/wordpress:5.5.3',
+    wordpress_latest: 'odoko/wordpress:latest',
+  },
 
   new(name, domain, db_pass, port=80):: {
     local containerPort = container.portsType,
@@ -24,78 +25,93 @@ local k = import 'ksonnet-util/kausal.libsonnet';
       db_name: name,
       db_user: name,
       db_pass: db_pass,
+      wordpress_image: $._images.wordpress,
+      uploads_size: '1Gi',
+      plugins: (import 'default-plugins.libsonnet'),
+    },
+
+    local config = self.config,
+
+    local plugins = {
+      plugins: [config.plugins.plugins[plugin] for plugin in std.objectFields(config.plugins.plugins)],
+      current_theme: config.plugins.current_theme,
+      themes: [config.plugins.themes[theme] for theme in std.objectFields(config.plugins.themes)],
     },
 
     config_map: configMap.new('wordpress-config')
-      + configMap.withData({'php-ini': importstr 'files/php.ini'})
-      + configMap.withData({'plugins.json': importstr 'files/plugins.json'})
-      ,
-   
+                + configMap.withData({ 'php-ini': importstr 'files/php.ini' })
+                + configMap.withData({ 'plugins.json': std.manifestJsonEx(std.prune(plugins), '  ') })
+    ,
+
+    pvc: pvc.new()
+         + pvc.metadata.withName('uploads')
+         + pvc.spec.resources.withRequests({ storage: config.uploads_size })
+         + pvc.spec.withAccessModes(['ReadWriteMany'])
+         + pvc.spec.withStorageClassName('csi-cephfs')
+         + { apiVersion: 'v1', kind: 'PersistentVolumeClaim' },
+
     local volumes = [
       volume.fromConfigMap(name='wordpress-config', configMapName='wordpress-config'),
       volume.fromSecret('gcs-auth', 'gcs-auth'),
+      volume.fromPersistentVolumeClaim('uploads', 'uploads'),
     ],
 
     local volumeMounts = [
-      mount.new('wordpress-config', '/usr/local/etc/php/conf.d/php.ini').withSubPath('php.ini'),
-      mount.new('wordpress-config', '/plugins/plugins.json').withSubPath('plugins.json'),
-      mount.new('gcs-auth', 'var/run/secrets/gcs-auth', true),
+      mount.new('wordpress-config', '/usr/local/etc/php/conf.d/php.ini') + mount.withSubPath('php.ini'),
+      mount.new('wordpress-config', '/plugins/plugins.json') + mount.withSubPath('plugins.json'),
+      mount.new('gcs-auth', '/var/run/secrets/gcs-auth', true),
+      mount.new('uploads', '/var/www/html/wp-content/uploads'),
     ],
 
-    local _container = container.new(name, $._images.wordpress)
-      .withPorts(containerPort.new(port))
-      .withImagePullPolicy('Always')
-      .withVolumeMounts(volumeMounts)
-      .withEnvMap({
-        CMD: "wordpress",
-        PLUGINS_FILE: "/plugins/plugins.json",
-        WORDPRESS_DB_HOST: "mysql.mysql",
-        WORDPRESS_DB_USER: name,
-        WORDPRESS_DB_PASSWORD: "wordpress",
-        WORDPRESS_DB_NAME: name,
-        WP_DEBUG: "true",
-      }),
+    _container:: container.new(name, self.config.wordpress_image)
+                 + container.withPorts(containerPort.new(port))
+                 + container.withImagePullPolicy('Always')
+                 + container.withVolumeMounts(volumeMounts)
+                 + container.withEnvMap({
+                   CMD: 'wordpress',
+                   PLUGINS_FILE: '/plugins/plugins.json',
+                   WORDPRESS_DB_HOST: 'mysql.mysql',
+                   WORDPRESS_DB_USER: name,
+                   WORDPRESS_DB_PASSWORD: 'wordpress',
+                   WORDPRESS_DB_NAME: name,
+                   WP_DEBUG: 'true',
+                 }),
 
-    local _initContainer = container.new(name + "-init", 'busybox')
-      .withVolumeMounts(volumeMounts)
-      .withCommand(["sh", "-c", "chown -R www-data:www-data /var/www/html/wp-content/uploads"]),
+    local _initContainer = container.new(name + '-init', 'busybox')
+                           + container.withVolumeMounts(volumeMounts)
+                           + container.withCommand(['sh', '-c', 'chown -R www-data:www-data /var/www/html/wp-content/uploads']),
 
-    local labels = {app: name},
+    local labels = { app: name },
 
     service: service.new(name, labels, servicePort.new(port, port))
-      .withType("ClusterIP")
-      ,
+             + service.spec.withType('ClusterIP')
+    ,
 
-    statefulset: statefulset.new('wordpress', 1, [_container], [], labels)
-      .withVolumes(volumes)
-      .withInitContainers([_initContainer])
-      + statefulset.mixin.spec.withServiceName(name)
-      ,
+    statefulset: statefulset.new('wordpress', 1, [self._container], [], labels)
+                 + statefulset.spec.template.spec.withVolumes(volumes)
+                 + statefulset.spec.template.spec.withInitContainers([_initContainer])
+                 + statefulset.spec.withServiceName(name),
   },
 
   withReplicas(replicas):: {
     statefulset+: statefulset.mixin.spec.withReplicas(replicas),
   },
 
-  withHostPath():: {
-    local name = super.config.name,
-    local sts = super.statefulset,
-
-    statefulset+: 
-      statefulset.mixin.spec.template.spec.withVolumesMixin(volume.fromHostPath('uploads', '/uploads/%s' % name))
-      + statefulset.mixin.spec.template.spec.withContainers([
-        _container + container.withVolumeMountsMixin(mount.new('uploads', '/var/www/html/wp-content/uploads'))
-        for _container in sts.spec.template.spec.containers
-      ])
-      + statefulset.mixin.spec.template.spec.withInitContainers([
-        _container + container.withVolumeMountsMixin(mount.new('uploads', '/var/www/html/wp-content/uploads'))
-        for _container in sts.spec.template.spec.initContainers
-      ])
-      ,
+  withPlugins(plugins):: {
+    config+:: {
+      plugins+:: plugins,
+    },
   },
 
   withNodeSelector(selector):: {
-    statefulset+: statefulset.mixin.spec.template.spec.withNodeSelector(selector)
+    statefulset+: statefulset.mixin.spec.template.spec.withNodeSelector(selector),
   },
 
+  withImagePullSecret(secret):: {
+    local imagePullSecrets = statefulset.mixin.spec.template.spec.imagePullSecretsType,
+    statefulset+: statefulset.mixin.spec.template.spec.withImagePullSecrets(
+      imagePullSecrets.new() +
+      imagePullSecrets.withName(secret)
+    ),
+  },
 }
