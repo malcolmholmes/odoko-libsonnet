@@ -1,10 +1,10 @@
-local k = import 'ksonnet-util/kausal.libsonnet';
+local k = import 'k.libsonnet';
+local kausal = import 'ksonnet-util/kausal.libsonnet';
 {
   local statefulset = k.apps.v1.statefulSet,
   local container = k.core.v1.container,
   local containerPort = container.portsType,
   local service = k.core.v1.service,
-  local servicePort = k.core.v1.service.mixin.spec.portsType,
   local volume = k.core.v1.volume,
   local pvc = k.core.v1.persistentVolumeClaim,
   local pv = k.core.v1.persistentVolume,
@@ -14,25 +14,15 @@ local k = import 'ksonnet-util/kausal.libsonnet';
     mysql: 'mysql:5.7',
   },
 
-  withPV(size):: {
-    pv: pv.new()
-        + pv.mixin.metadata.withName('database')
-        + pv.mixin.spec.withStorageClassName('storage')
-        + pv.mixin.spec.hostPath.withPath('/data/db')
-        + pv.mixin.spec.withAccessModes(['ReadWriteOnce'])
-        + pv.mixin.spec.withCapacity({ storage: size }),
-  },
-
   withPVC(size)::
     {
       local _containers = super.statefulset.spec.template.spec.containers,
       statefulset+: {
         spec+: {
           volumeClaimTemplates::: statefulset.mixin.spec.withVolumeClaimTemplatesMixin(
-            pvc.new()
+            pvc.new('mysql')
             + pvc.mixin.spec.resources.withRequests({ storage: size })
             + pvc.mixin.spec.withAccessModes(['ReadWriteOnce'])
-            + pvc.mixin.spec.withStorageClassName('storage')
             + pvc.mixin.metadata.withName('database')
           ).spec.volumeClaimTemplates,
           template+: {
@@ -51,27 +41,26 @@ local k = import 'ksonnet-util/kausal.libsonnet';
     name:: name,
 
     local _container = container.new(name, $._images.mysql)
-                       .withPorts(containerPort.new(port))
-                       .withArgs(['--verbose', '--ignore-db-dir', 'lost+found'])
-                       .withEnvMap({
-      MYSQL_ROOT_PASSWORD: rootPassword,
-      MYSQL_DATABASE: dbName,
-      MYSQL_USER: username,
-      MYSQL_PASSWORD: password,
-    })
+                       + container.withPorts(containerPort.newNamed(port, 'mysql'))
+                       + container.withArgs(['--verbose', '--ignore-db-dir', 'lost+found'])
+                       + container.withEnvMap({
+                         MYSQL_ROOT_PASSWORD: rootPassword,
+                         MYSQL_DATABASE: dbName,
+                         MYSQL_USER: username,
+                         MYSQL_PASSWORD: password,
+                       })
     ,
 
     local labels = { app: name },
 
-    service: service.new(name, labels, servicePort.new(port, port))
-             .withClusterIp('None'),
-
     statefulset: statefulset.new(name, 1, _container, [], labels)
-                 .withServiceName(name),
+                 + statefulset.mixin.spec.withServiceName('mysql'),
+
+    service: kausal.util.serviceFor(self.statefulset),
   },
 
   withHostVolume(path):: {
-    statefulset+: k.util.hostVolumeMount(super.name, path, '/var/lib/mysql'),
+    statefulset+: kausal.util.hostVolumeMount(super.name, path, '/var/lib/mysql'),
   },
 
   withNodeSelector(selector):: {
