@@ -6,20 +6,19 @@ local k = import 'ksonnet-util/kausal.libsonnet';
 
   withDatabase(root_password):: {
     local config = super.config,
-    local _container = container.new(config.name + "-backup", $._images.wordpress)
-      .withImagePullPolicy('Always')
-      .withEnvMap({
-        CMD: 'database',
-        WORDPRESS_DB_NAME: config.name,
-	    WORDPRESS_DB_ROOT_PASSWORD: root_password,
-        WORDPRESS_DB_PASSWORD: config.db_pass,
-      })
-      ,
+    local _container = container.new(config.name + '-backup', $._images.wordpress_latest)
+                       + container.withImagePullPolicy('Always')
+                       + container.withEnvMap({
+                         CMD: 'database',
+                         WORDPRESS_DB_NAME: config.name,
+                         WORDPRESS_DB_ROOT_PASSWORD: root_password,
+                         WORDPRESS_DB_PASSWORD: config.db_pass,
+                       })
+    ,
 
     job: job.new()
-      + job.mixin.metadata.withName('%s-create-database' % super.config.name)
-      + job.mixin.spec.template.spec.withContainers(_container)
-      + job.mixin.spec.template.spec.withRestartPolicy('Never')
-      ,
+         + job.mixin.metadata.withName('%s-create-database' % super.config.name)
+         + job.mixin.spec.template.spec.withContainers(_container)
+         + job.mixin.spec.template.spec.withRestartPolicy('Never'),
   },
 }
