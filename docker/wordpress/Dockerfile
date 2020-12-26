@@ -1,4 +1,4 @@
-FROM wordpress:5.5.1
+FROM wordpress:5.5.3
 
 RUN apt-get update \
  && apt-get install -y unzip python2.7 default-mysql-client jq \
