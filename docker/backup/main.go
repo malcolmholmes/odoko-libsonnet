@@ -18,6 +18,9 @@ func contains(s []string, e string) bool {
 
 func main() {
 
+	log.Println("ODOKO Backup Utility")
+	log.Println("====================")
+
 	cmds := strings.Split(os.Getenv("CMD"), ",")
 	dbName := os.Getenv("DB_NAME")
 	dbHost := os.Getenv("DB_HOST")
