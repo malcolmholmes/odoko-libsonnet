@@ -27,6 +27,8 @@ local k = import 'ksonnet-util/kausal.libsonnet';
     dyndns_cron: cronjob.new()
        + cronjob.mixin.metadata.withName('dyn-dns-' + zone)
        + cronjob.mixin.spec.withSchedule('*/1 * * * *')
+       + cronjob.mixin.spec.withSuccessfulJobsHistoryLimit(1)
+       + cronjob.mixin.spec.withFailedJobsHistoryLimit(1)
        + cronjob.mixin.spec.jobTemplate.spec.template.spec.withContainers([_container])
        + cronjob.mixin.spec.jobTemplate.spec.template.spec.withRestartPolicy('OnFailure')
        + {
