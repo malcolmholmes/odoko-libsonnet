@@ -57,7 +57,7 @@ local k = import 'ksonnet-util/kausal.libsonnet';
       roleRule.withVerbs(['update']),
     ]),
 
-    nginx_ingress_role:
+  nginx_ingress_role:
     role.new() +
     role.mixin.metadata.withNamespace($._config.namespace) +
     role.mixin.metadata.withName('nginx-ingress-role') +
@@ -125,98 +125,98 @@ local k = import 'ksonnet-util/kausal.libsonnet';
     serviceAccount.mixin.metadata.withNamespace($._config.namespace),
 
   ingress_service: service.new(
-    'ingress-nginx', 
-    {
-      'app': 'ingress',
-      'app.kubernetes.io/name': 'ingress-nginx',
-      'app.kubernetes.io/part-of': 'ingress-nginx'
-    },
-    [
-      servicePort.newNamed('http', 80, 80).withProtocol("TCP"),
-      servicePort.newNamed('https', 443, 443).withProtocol("TCP"),
-    ])
-    .withType('LoadBalancer')
-    .withLoadBalancerIp($._config.ingress.ipAddress)
-    + service.mixin.metadata.withNamespace($._config.namespace)
-    + service.mixin.spec.withSelector({ name: 'ingress-nginx' })
-    + service.mixin.spec.withExternalTrafficPolicy('Local')
-    , 
+                     'ingress-nginx',
+                     {
+                       app: 'ingress',
+                       'app.kubernetes.io/name': 'ingress-nginx',
+                       'app.kubernetes.io/part-of': 'ingress-nginx',
+                     },
+                     [
+                       servicePort.newNamed('http', 80, 80) + servicePort.withProtocol('TCP'),
+                       servicePort.newNamed('https', 443, 443) + servicePort.withProtocol('TCP'),
+                     ]
+                   )
+                   + service.mixin.spec.withType('LoadBalancer')
+                   + service.mixin.spec.withLoadBalancerIp($._config.ingress.ipAddress)
+                   + service.mixin.metadata.withNamespace($._config.namespace)
+                   + service.mixin.spec.withSelector({ name: 'ingress-nginx' })
+                   + service.mixin.spec.withExternalTrafficPolicy('Local')
+  ,
 
   nginx_configuration_config_map:
     configMap.new('nginx-configuration')
     + configMap.mixin.metadata.withNamespace($._config.namespace)
     + configMap.withData({})
-    ,
+  ,
 
   nginx_tcp_config_map:
     configMap.new('tcp-services')
     + configMap.mixin.metadata.withNamespace($._config.namespace)
     + configMap.withData({})
-    ,
+  ,
 
   nginx_udp_config_map:
     configMap.new('udp-services')
     + configMap.mixin.metadata.withNamespace($._config.namespace)
     + configMap.withData({})
-    ,
+  ,
 
-  local ingress_nginx_ports = [{
-        name: 'http',
-        containerPort: 80,
-      },
-      {
-        name: 'https',
-	containerPort: 443
-      }],
+  local ingress_nginx_ports = [
+    {
+      name: 'http',
+      containerPort: 80,
+    },
+    {
+      name: 'https',
+      containerPort: 443,
+    },
+  ],
 
   local ingress_nginx_container = container.new('nginx-ingress-controller', $._images.nginx)
-    .withArgs([
-      '/nginx-ingress-controller',
-      '--configmap=' + $._config.namespace + '/nginx-configuration',
-      '--tcp-services-configmap=' + $._config.namespace + '/tcp-services',
-      '--udp-services-configmap=' + $._config.namespace + '/udp-services',
-      '--publish-service=' + $._config.namespace + '/ingress-nginx',
-      '--annotations-prefix=nginx.ingress.kubernetes.io',
-    ])
-    .withEnv([
-      container.envType.fromFieldPath('POD_NAME', 'metadata.name'),
-      container.envType.fromFieldPath('POD_NAMESPACE', 'metadata.namespace'),
-    ])
-    .withPorts($._config.ingress.ports)
-    + container.mixin.securityContext.withRunAsUser(33) // www-data
-    + container.mixin.securityContext.withAllowPrivilegeEscalation(true)
-    + container.mixin.securityContext.capabilities.withDrop('ALL')
-    + container.mixin.securityContext.capabilities.withAdd('NET_BIND_SERVICE')
-    + container.mixin.livenessProbe.httpGet.withPath('/healthz')
-    + container.mixin.livenessProbe.httpGet.withPort(10254)
-    + container.mixin.livenessProbe.httpGet.withScheme('HTTP')
-    + container.mixin.livenessProbe
-      .withPeriodSeconds(10)
-      .withSuccessThreshold(1)
-      .withFailureThreshold(3)
-      .withInitialDelaySeconds(10)
-      .withTimeoutSeconds(10) 
-    + container.mixin.readinessProbe.httpGet.withPath('/healthz')
-    + container.mixin.readinessProbe.httpGet.withPort(10254)
-    + container.mixin.readinessProbe.httpGet.withScheme('HTTP')
-    + container.mixin.readinessProbe
-      .withPeriodSeconds(10)
-      .withSuccessThreshold(1)
-      .withFailureThreshold(3)
-      .withTimeoutSeconds(10),
+                                  + container.withArgs([
+                                    '/nginx-ingress-controller',
+                                    '--configmap=' + $._config.namespace + '/nginx-configuration',
+                                    '--tcp-services-configmap=' + $._config.namespace + '/tcp-services',
+                                    '--udp-services-configmap=' + $._config.namespace + '/udp-services',
+                                    '--publish-service=' + $._config.namespace + '/ingress-nginx',
+                                    '--annotations-prefix=nginx.ingress.kubernetes.io',
+                                  ])
+                                  + container.withEnv([
+                                    container.envType.fromFieldPath('POD_NAME', 'metadata.name'),
+                                    container.envType.fromFieldPath('POD_NAMESPACE', 'metadata.namespace'),
+                                  ])
+                                  + container.withPorts($._config.ingress.ports)
+                                  + container.mixin.securityContext.withRunAsUser(33)  // www-data
+                                  + container.mixin.securityContext.withAllowPrivilegeEscalation(true)
+                                  + container.mixin.securityContext.capabilities.withDrop('ALL')
+                                  + container.mixin.securityContext.capabilities.withAdd('NET_BIND_SERVICE')
+                                  + container.mixin.livenessProbe.httpGet.withPath('/healthz')
+                                  + container.mixin.livenessProbe.httpGet.withPort(10254)
+                                  + container.mixin.livenessProbe.httpGet.withScheme('HTTP')
+                                  + container.mixin.livenessProbe.withPeriodSeconds(10)
+                                  + container.mixin.livenessProbe.withSuccessThreshold(1)
+                                  + container.mixin.livenessProbe.withFailureThreshold(3)
+                                  + container.mixin.livenessProbe.withInitialDelaySeconds(10)
+                                  + container.mixin.livenessProbe.withTimeoutSeconds(10)
+                                  + container.mixin.readinessProbe.httpGet.withPath('/healthz')
+                                  + container.mixin.readinessProbe.httpGet.withPort(10254)
+                                  + container.mixin.readinessProbe.httpGet.withScheme('HTTP')
+                                  + container.mixin.readinessProbe.withPeriodSeconds(10)
+                                  + container.mixin.readinessProbe.withSuccessThreshold(1)
+                                  + container.mixin.readinessProbe.withFailureThreshold(3)
+                                  + container.mixin.readinessProbe.withTimeoutSeconds(10),
 
-  local nginxLabels = {name: 'ingress-nginx'},
+  local nginxLabels = { name: 'ingress-nginx' },
 
   ingress_nginx_deployment: deployment.new('ingress-nginx', $._config.ingress.replicas, [ingress_nginx_container])
-    + deployment.mixin.metadata.withNamespace($._config.namespace)
-    + deployment.mixin.spec.template.spec.withServiceAccountName('nginx-ingress-serviceaccount')
-    + deployment.mixin.spec.template.metadata.withAnnotations({
-      'prometheus.io/scrape': 'true',
-      'prometheus.io/port': '10254',
-    })
-    + deployment.mixin.metadata.withLabels(nginxLabels)
-    + deployment.mixin.spec.template.metadata.withLabels(nginxLabels)
-    + deployment.mixin.spec.selector.withMatchLabels(nginxLabels)
-    ,
+                            + deployment.mixin.metadata.withNamespace($._config.namespace)
+                            + deployment.mixin.spec.template.spec.withServiceAccountName('nginx-ingress-serviceaccount')
+                            + deployment.mixin.spec.template.metadata.withAnnotations({
+                              'prometheus.io/scrape': 'true',
+                              'prometheus.io/port': '10254',
+                            })
+                            + deployment.mixin.metadata.withLabels(nginxLabels)
+                            + deployment.mixin.spec.template.metadata.withLabels(nginxLabels)
+                            + deployment.mixin.spec.selector.withMatchLabels(nginxLabels),
 
 }
