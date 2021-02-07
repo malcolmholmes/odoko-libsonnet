@@ -13,7 +13,7 @@ for PLUGIN_URL in $(jq -r '.plugins[].url' $PLUGINS_FILE); do
     echo "  $ZIP_FILE exists - skipping"
     continue
   elif [[ $PLUGIN_URL =~ ^http ]]; then
-    curl -s $PLUGIN_URL > $ZIP_FILE
+    curl -sL $PLUGIN_URL > $ZIP_FILE
   elif [[ $PLUGIN_URL =~ ^gs: ]]; then
     gsutil cp $PLUGIN_URL $ZIP_FILE
   else
@@ -33,7 +33,7 @@ for THEME_URL in $(jq -r '.themes[].url' $PLUGINS_FILE); do
     echo "  $ZIP_FILE exists - skipping"
     continue
   elif [[ $THEME_URL =~ ^http ]]; then
-    curl -s $THEME_URL > $ZIP_FILE
+    curl -sL $THEME_URL > $ZIP_FILE
   elif [[ $THEME_URL =~ ^gs: ]]; then
     gsutil cp $THEME_URL $ZIP_FILE
   else
