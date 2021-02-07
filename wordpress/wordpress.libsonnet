@@ -7,7 +7,7 @@ local k = import 'ksonnet-util/kausal.libsonnet';
   local container = k.core.v1.container,
 
   _images+:: {
-    wordpress: 'odoko/wordpress:5.5.3',
+    wordpress: 'odoko/wordpress:5.6.0',
     wordpress_latest: 'odoko/wordpress:latest',
   },
 
@@ -39,8 +39,10 @@ local k = import 'ksonnet-util/kausal.libsonnet';
     },
 
     config_map: configMap.new('wordpress-config')
-                + configMap.withData({ 'php-ini': importstr 'files/php.ini' })
-                + configMap.withData({ 'plugins.json': std.manifestJsonEx(std.prune(plugins), '  ') })
+                + configMap.withData({
+                  'php-ini': importstr 'files/php.ini',
+                  'plugins.json': std.manifestJsonEx(std.prune(plugins), '  '),
+                })
     ,
 
     pvc: pvc.new()
@@ -64,7 +66,7 @@ local k = import 'ksonnet-util/kausal.libsonnet';
     ],
 
     _container:: container.new(name, self.config.wordpress_image)
-                 + container.withPorts(containerPort.new(port))
+                 + container.withPorts(containerPort.newNamed(containerPort=port, name='http-metrics'))
                  + container.withImagePullPolicy('Always')
                  + container.withVolumeMounts(volumeMounts)
                  + container.withEnvMap({
@@ -84,7 +86,8 @@ local k = import 'ksonnet-util/kausal.libsonnet';
     local labels = { app: name },
 
     service: service.new(name, labels, servicePort.new(port, port))
-             + service.spec.withType('ClusterIP')
+             + service.spec.withType('NodePort')
+             + service.spec.withExternalTrafficPolicy('Local')
     ,
 
     statefulset: statefulset.new('wordpress', 1, [self._container], [], labels)
@@ -100,6 +103,20 @@ local k = import 'ksonnet-util/kausal.libsonnet';
   withPlugins(plugins):: {
     config+:: {
       plugins+:: plugins,
+    },
+  },
+
+  withTheme(name, theme):: {
+    config+:: {
+      plugins+: {
+        current_theme: name,
+        themes: {
+          [name]+: {
+            name: name,
+            url: theme,
+          },
+        },
+      },
     },
   },
 
