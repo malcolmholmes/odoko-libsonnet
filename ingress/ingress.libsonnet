@@ -24,6 +24,8 @@ local k = import 'ksonnet-util/kausal.libsonnet';
         name: 'ingress',
         containerPort: 8080,
       }],
+      nginx+: {
+      },
     },
   },
 
@@ -146,7 +148,7 @@ local k = import 'ksonnet-util/kausal.libsonnet';
   nginx_configuration_config_map:
     configMap.new('nginx-configuration')
     + configMap.mixin.metadata.withNamespace($._config.namespace)
-    + configMap.withData({})
+    + configMap.withData($._config.ingress.nginx)
   ,
 
   nginx_tcp_config_map:
