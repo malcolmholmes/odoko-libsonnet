@@ -215,10 +215,9 @@ func getDomains(services serviceSet) (domainSet, error) {
 		errorsOccurred.With(prometheus.Labels{"type": "k8s-list-ingresses", "domain": ""}).Inc()
 		return nil, err
 	}
-	ingressCount.Set(float64(len(ingresses.Items)))
-
 	domains := domainSet{}
 
+	ingressCounter := 0
 	for _, ingress := range ingresses.Items {
 		var zone string
 		for k, v := range ingress.Annotations {
@@ -230,15 +229,18 @@ func getDomains(services serviceSet) (domainSet, error) {
 		if zone == "" {
 			continue
 		}
+		ingressCounter++
 
 		for _, rule := range ingress.Spec.Rules {
 			ip, err := lookupIPViaGoogle(services, zone, rule.Host)
 			if err != nil {
-				return nil, err
+				log.Printf("Skipping %s: %s", rule.Host, err)
+				continue
 			}
 			domains[rule.Host] = Domain{zone, rule.Host, ip}
 		}
 	}
+	ingressCount.Set(float64(ingressCounter))
 	domainCount.Set(float64(len(domains)))
 	return domains, nil
 }

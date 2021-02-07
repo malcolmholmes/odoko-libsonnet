@@ -20,6 +20,6 @@ build-image:
 	docker build -t $(IMAGE) .
 	docker tag $(IMAGE) $(IMAGE):$(IMAGE_TAG)
 
-push-image:
+push-image: build-image
 	docker push $(IMAGE):$(IMAGE_TAG)
 	docker push $(IMAGE):latest
