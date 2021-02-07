@@ -29,7 +29,8 @@ local k = import 'ksonnet-util/kausal.libsonnet';
     + ingress.mixin.metadata.withAnnotationsMixin({
       'kubernetes.io/tls-acme': 'true',
       //      'kubernetes.io/ingress.class': 'nginx',
-      'nginx.ingress.kubernetes.io/affinity-mode': 'persistent',
+      //'nginx.ingress.kubernetes.io/affinity-mode': 'persistent',
+      'cert-manager.io/cluster-issuer': 'letsencrypt-prod',
       [if zone != null then 'odoko.com/dyn-dns-zone' else null]: zone,
     })
     //    + ingress.mixin.spec.backend.withServiceName(serviceName)
