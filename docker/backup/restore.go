@@ -11,7 +11,6 @@ import (
 	"strings"
 
 	"cloud.google.com/go/storage"
-	_ "github.com/go-sql-driver/mysql"
 )
 
 func readToday(bucket, path string) (string, error) {
