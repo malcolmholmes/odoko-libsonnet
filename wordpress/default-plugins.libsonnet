@@ -45,8 +45,20 @@
       module: 'wp-open-graph/wp-open-graph.php',
     },
     smtp_mail: {
-      url: 'https://downloads.wordpress.org/plugin/wp-mail-smtp.2.4.0.zip',
-      module: 'wp-mail-smtp/wp-mail-smtp.php',
+      url: 'https://downloads.wordpress.org/plugin/wp-mail-smtp.2.7.0.zip',
+      module: 'wp-mail-smtp/wp_mail_smtp.php',
+    },
+    basicauth: {
+      url: 'gs://odoko-web/packages/basicauth.zip',
+      module: 'basicauth/basicauth.php',
+    },
+    wp_statistics: {
+      url: 'https://downloads.wordpress.org/plugin/wp-statistics.13.0.5.zip',
+      module: 'wp-statistics/wp-statistics.php',
+    },
+    prometheus: {
+      url: 'https://github.com/dannykopping/wp_prometheus/archive/master.zip',
+      module: 'wp_prometheus-master/prometheus.php',
     },
   },
   current_theme: 'Divi',
