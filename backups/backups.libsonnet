@@ -47,8 +47,8 @@ local k = import 'ksonnet-util/kausal.libsonnet';
       DB_PASS: db_pass,
       DB_USER: db_name,
     },
-    uploadsMount:: [mount.new('uploads', '/uploads')],
-    uploadsVolume:: [volume.fromPersistentVolumeClaim('uploads', 'uploads')],
+    uploadsMount:: [mount.new('content', '/content')],
+    uploadsVolume:: [volume.fromPersistentVolumeClaim('content', 'content')],
     mounts:: [mount.new('gcs-auth', '/var/run/secrets/gcs-auth', true)] + self.uploadsMount,
     volumes:: [volume.fromSecret('gcs-auth', 'gcs-auth')] + self.uploadsVolume,
 
@@ -68,15 +68,6 @@ local k = import 'ksonnet-util/kausal.libsonnet';
     backup_cron+: cronjob.mixin.spec.withSchedule(schedule),
   },
 
-  withBackupPath(path, newerThanSeconds):: {
-    env+:: {
-      BACKUP_PATH: '/backups',
-      NEWER_THAN_SECONDS: '%d' % newerThanSeconds,
-    },
-    mounts+:: [mount.new('backups', '/backups')],
-    volumes+:: [volume.fromHostPath('backups', path)],
-  },
-
   newRestoreJob(db_name, db_pass, bucket, creds, path='/uploads', domain=null, replace=null, from=db_name): {
     env:: {
       CMD: 'restore-db,restore-uploads',
@@ -87,8 +78,8 @@ local k = import 'ksonnet-util/kausal.libsonnet';
       DB_USER: db_name,
     },
 
-    uploadsMount:: [mount.new('uploads', '/uploads')],
-    uploadsVolume:: [volume.fromPersistentVolumeClaim('uploads', 'uploads')],
+    uploadsMount:: [mount.new('content', '/content')],
+    uploadsVolume:: [volume.fromPersistentVolumeClaim('content', 'content')],
     mounts:: [mount.new('gcs-auth', '/var/run/secrets/gcs-auth', true)] + self.uploadsMount,
     volumes:: [volume.fromSecret('gcs-auth', 'gcs-auth')] + self.uploadsVolume,
     local volumes = self.volumes,
@@ -104,9 +95,43 @@ local k = import 'ksonnet-util/kausal.libsonnet';
                  + cronjob.mixin.spec.jobTemplate.spec.template.spec.withVolumes(volumes),
   },
 
-  withoutUploadsVolume():: {
+  newInitialiseJob(db_name, db_root_pass, db_pass, bucket, creds, path='/uploads', domain=null, replace=null, from=db_name): {
+    env:: {
+      CMD: 'initialise,restore-db,restore-uploads',
+      BUCKET: bucket,
+      DB_NAME: db_name,
+      DB_HOST: 'mysql.mysql',
+      DB_ROOT_PASS: db_root_pass,
+      DB_PASS: db_pass,
+      DB_USER: db_name,
+    },
+
+    uploadsMount:: [mount.new('content', '/content')],
+    uploadsVolume:: [volume.fromPersistentVolumeClaim('content', 'content')],
+    mounts:: [mount.new('gcs-auth', '/var/run/secrets/gcs-auth', true)] + self.uploadsMount,
+    volumes:: [volume.fromSecret('gcs-auth', 'gcs-auth')] + self.uploadsVolume,
+    local volumes = self.volumes,
+
+    local restore_container = _container(self.env, creds, self.mounts, domain, replace, from),
+    initialise_job: job.new()
+                    + job.mixin.metadata.withName('%s-initialise' % db_name)
+                    + job.mixin.spec.template.spec.withContainers([restore_container])
+                    + job.mixin.spec.template.spec.withRestartPolicy('Never')
+                    + job.mixin.spec.template.spec.withVolumes(volumes),
+  },
+
+  withNewerThanSeconds(newerThanSeconds):: {
+    env+:: {
+      BACKUP_PATH: '/backups',
+      NEWER_THAN_SECONDS: '%d' % newerThanSeconds,
+    },
+  },
+
+  withBackupMount(pvcName):: {
     uploadsTasks:: '',
     uploadsMount:: [],
     uploadsVolume:: [],
+    mounts+:: [mount.new(pvcName, '/backups')],
+    volumes+:: [volume.fromPersistentVolumeClaim(pvcName, pvcName)],
   },
 }
