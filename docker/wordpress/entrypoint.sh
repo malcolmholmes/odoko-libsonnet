@@ -15,12 +15,19 @@ EOF
 }
 
 if [ "$CMD" = "wordpress" ]; then
+  echo "RewriteRule . /index.php" > /var/www/html/wp-content/downloads/.htaccess
   echo "Enabling plugins"
   setup_boto
-  /wordpress/install-plugins.sh
-  php /wordpress/install-plugins.php 
+  /wordpress/install-plugins.sh | tee -a /wordpress/install.log
+  MU_PLUGINS=/var/www/html/wp-content/mu-plugins
+  if [ -f $MU_PLUGINS ]; then rm $MU_PLUGINS; fi
+  mkdir -p $MU_PLUGINS
+  cp /wordpress/install.php $MU_PLUGINS/
+  cp /wordpress/mu-plugins/*.php $MU_PLUGINS/
+  (sleep 10 && curl -s localhost/odoko-install && rm $MU_PLUGINS/install.php) &
 
   echo "Initialising WordPress"
+  chown www-data:www-data /var/www/html/wp-content
   /usr/local/bin/docker-entrypoint.sh apache2-foreground
   exit
 
@@ -31,14 +38,6 @@ elif [ "$CMD" = "database" ]; then
   echo "With $SQL"
   mysql -uroot -p$WORDPRESS_DB_ROOT_PASSWORD -hmysql.mysql -e "$SQL"
   echo "Done."
-
-elif [ "$CMD" = "backup" ]; then
-  setup_boto
-  /wordpress/backup.sh
-
-elif [ "$CMD" = "restore" ]; then
-  setup_boto
-  /wordpress/restore.sh
 
 else
   echo "Unknown command: $CMD"

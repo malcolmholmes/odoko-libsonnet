@@ -12,8 +12,9 @@ RUN apt-get update \
  && pecl install apcu-${APCU_VERSION} \
  && docker-php-ext-enable apcu
 
+ADD mu-plugins/* /wordpress/mu-plugins/
 ADD *.sh /wordpress/
-ADD install-*.php /wordpress/
+ADD install*.php /wordpress/
 ENTRYPOINT [ "/wordpress/entrypoint.sh" ]
 
 #RUN echo "extension=apcu.so" >> /usr/local/etc/php/php.ini && \
