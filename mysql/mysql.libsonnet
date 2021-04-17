@@ -42,7 +42,7 @@ local kausal = import 'ksonnet-util/kausal.libsonnet';
 
     local _container = container.new(name, $._images.mysql)
                        + container.withPorts(containerPort.newNamed(port, 'mysql'))
-                       + container.withArgs(['--verbose', '--ignore-db-dir', 'lost+found'])
+                       + container.withArgs(['--verbose', '--ignore-db-dir', 'lost+found', '--max_allowed_packet=32505856'])
                        + container.withEnvMap({
                          MYSQL_ROOT_PASSWORD: rootPassword,
                          MYSQL_DATABASE: dbName,
