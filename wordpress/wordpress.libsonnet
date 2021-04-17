@@ -5,6 +5,7 @@ local k = import 'ksonnet-util/kausal.libsonnet';
   local mount = k.core.v1.volumeMount,
   local statefulset = k.apps.v1.statefulSet,
   local container = k.core.v1.container,
+  local secret = k.core.v1.secret,
 
   _images+:: {
     wordpress: 'odoko/wordpress:5.7.1',
@@ -26,8 +27,9 @@ local k = import 'ksonnet-util/kausal.libsonnet';
       db_user: name,
       db_pass: db_pass,
       wordpress_image: $._images.wordpress,
-      uploads_size: '1Gi',
+      content_size: '5Gi',
       plugins: (import 'default-plugins.libsonnet'),
+      port_name: 'wordpress',
     },
 
     local config = self.config,
@@ -45,28 +47,27 @@ local k = import 'ksonnet-util/kausal.libsonnet';
                 })
     ,
 
-    pvc: pvc.new()
-         + pvc.metadata.withName('uploads')
-         + pvc.spec.resources.withRequests({ storage: config.uploads_size })
-         + pvc.spec.withAccessModes(['ReadWriteMany'])
-         + pvc.spec.withStorageClassName('csi-cephfs')
-         + { apiVersion: 'v1', kind: 'PersistentVolumeClaim' },
+    content_pvc: pvc.new()
+                 + pvc.metadata.withName('content')
+                 + pvc.spec.resources.withRequests({ storage: config.content_size })
+                 + pvc.spec.withAccessModes(['ReadWriteMany'])
+                 + pvc.spec.withStorageClassName('csi-cephfs')
+                 + { apiVersion: 'v1', kind: 'PersistentVolumeClaim' },
 
     local volumes = [
       volume.fromConfigMap(name='wordpress-config', configMapName='wordpress-config'),
-      volume.fromSecret('gcs-auth', 'gcs-auth'),
-      volume.fromPersistentVolumeClaim('uploads', 'uploads'),
+      volume.fromPersistentVolumeClaim('content', 'content'),
+      //      volume.fromPersistentVolumeClaim('uploads', 'uploads'),
     ],
 
     local volumeMounts = [
       mount.new('wordpress-config', '/usr/local/etc/php/conf.d/php.ini') + mount.withSubPath('php.ini'),
       mount.new('wordpress-config', '/plugins/plugins.json') + mount.withSubPath('plugins.json'),
-      mount.new('gcs-auth', '/var/run/secrets/gcs-auth', true),
-      mount.new('uploads', '/var/www/html/wp-content/uploads'),
+      mount.new('content', '/var/www/html/wp-content'),
     ],
 
     _container:: container.new(name, self.config.wordpress_image)
-                 + container.withPorts(containerPort.newNamed(containerPort=port, name='http-metrics'))
+                 + container.withPorts(containerPort.newNamed(containerPort=port, name=config.port_name))
                  + container.withImagePullPolicy('Always')
                  + container.withVolumeMounts(volumeMounts)
                  + container.withEnvMap({
@@ -77,11 +78,20 @@ local k = import 'ksonnet-util/kausal.libsonnet';
                    WORDPRESS_DB_PASSWORD: 'wordpress',
                    WORDPRESS_DB_NAME: name,
                    WP_DEBUG: 'true',
-                 }),
+                 })
+                 + container.mixin.livenessProbe.httpGet.withPath('/healthcheck')
+                 + container.mixin.livenessProbe.httpGet.withPort(config.port_name)
+                 + container.mixin.livenessProbe.withInitialDelaySeconds(5)
+                 + container.mixin.startupProbe.httpGet.withPath('/healthcheck')
+                 + container.mixin.startupProbe.httpGet.withPort(config.port_name)
+                 + container.mixin.startupProbe.withInitialDelaySeconds(5)
+                 + container.mixin.startupProbe.withPeriodSeconds(10)
+                 + container.mixin.startupProbe.withFailureThreshold(30)
+    ,
 
     local _initContainer = container.new(name + '-init', 'busybox')
                            + container.withVolumeMounts(volumeMounts)
-                           + container.withCommand(['sh', '-c', 'chown -R www-data:www-data /var/www/html/wp-content/uploads']),
+                           + container.withCommand(['sh', '-c', 'mkdir -p /var/www/html/wp-content/uploads && chown -R www-data:www-data /var/www/html/wp-content/uploads']),
 
     local labels = { app: name },
 
@@ -93,7 +103,8 @@ local k = import 'ksonnet-util/kausal.libsonnet';
     statefulset: statefulset.new('wordpress', 1, [self._container], [], labels)
                  + statefulset.spec.template.spec.withVolumes(volumes)
                  + statefulset.spec.template.spec.withInitContainers([_initContainer])
-                 + statefulset.spec.withServiceName(name),
+                 + statefulset.spec.withServiceName(name)
+                 + k.util.secretVolumeMount('gcs-auth', '/var/run/secrets/gcs-auth'),
   },
 
   withReplicas(replicas):: {
@@ -104,6 +115,10 @@ local k = import 'ksonnet-util/kausal.libsonnet';
     config+:: {
       plugins+:: plugins,
     },
+  },
+
+  withGoogleSecret(creds):: {
+    gcs_auth_secret: secret.new('gcs-auth', { key: std.base64(std.manifestJsonEx(creds, '')) }, 'Opaque'),
   },
 
   withTheme(name, theme):: {
