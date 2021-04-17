@@ -30,11 +30,20 @@ func main() {
 	backupPath := os.Getenv("BACKUP_PATH")
 	newerThanSeconds, err := strconv.Atoi(os.Getenv("NEWER_THAN_SECONDS"))
 	if err != nil {
-		log.Printf("Skipping: %v", err)
 		newerThanSeconds = 0
 	}
 
 	log.Println("Executing commands", cmds)
+
+	if contains(cmds, "initialise") {
+		log.Println("Initialising database")
+		dbRootPass := os.Getenv("DB_ROOT_PASS")
+		err := initialiseDatabase(dbHost, dbRootPass, dbName, dbUser, dbPass)
+		if err != nil {
+			panic(err)
+		}
+	}
+
 	if contains(cmds, "backup-db") {
 		log.Println("Backing up db")
 		err := backupMysql(dbHost, dbName, dbUser, dbPass, bucket)
