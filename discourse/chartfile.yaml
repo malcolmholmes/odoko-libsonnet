@@ -1,0 +1,10 @@
+directory: charts
+repositories:
+- name: stable
+  url: https://kubernetes-charts.storage.googleapis.com
+- name: bitnami
+  url: https://charts.bitnami.com/bitnami
+requires:
+- chart: bitnami/discourse
+  version: 0.4.1
+version: 1
