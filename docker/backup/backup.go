@@ -131,7 +131,7 @@ func writeToday(today, bucket, path string) error {
 func backupUploads(env, bucket string) error {
 	today := getToday()
 	gcsPath := fmt.Sprintf("backups/%s/uploads/%s.tgz", env, today)
-	tar, err := compress("/uploads")
+	tar, err := compress("/content/uploads")
 	if err != nil {
 		return err
 	}
