@@ -1,9 +1,9 @@
-FROM wordpress:5.6.0
+FROM wordpress:5.7.1
 
 ARG APCU_VERSION=5.1.19
 
 RUN apt-get update \
- && apt-get install -y unzip python2.7 default-mysql-client jq \
+ && apt-get install -y unzip python2.7 default-mysql-client jq vim \
  && apt-get purge -y --auto-remove -o APT::AutoRemove::RecommendsImportant=false \
  && rm -rf /var/lib/apt/lists/* \
  && ln -s /usr/bin/python2.7 /usr/bin/python \

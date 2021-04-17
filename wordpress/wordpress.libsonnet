@@ -7,7 +7,7 @@ local k = import 'ksonnet-util/kausal.libsonnet';
   local container = k.core.v1.container,
 
   _images+:: {
-    wordpress: 'odoko/wordpress:5.6.0',
+    wordpress: 'odoko/wordpress:5.7.1',
     wordpress_latest: 'odoko/wordpress:latest',
   },
 
