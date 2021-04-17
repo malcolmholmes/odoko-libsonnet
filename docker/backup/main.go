@@ -61,7 +61,7 @@ func main() {
 
 	if contains(cmds, "prune-db") {
 		log.Println("Pruning old db backups")
-		err := pruneBackups(dbName, "db")
+		err := pruneBackups(bucket, dbName, "db")
 		if err != nil {
 			panic(err)
 		}
@@ -69,7 +69,7 @@ func main() {
 
 	if contains(cmds, "prune-uploads") {
 		log.Println("Pruning old upload backups")
-		err := pruneBackups(dbName, "uploads")
+		err := pruneBackups(bucket, dbName, "uploads")
 		if err != nil {
 			panic(err)
 		}
@@ -87,12 +87,13 @@ func main() {
 	}
 
 	if contains(cmds, "restore-uploads") {
-		log.Println("Backing up uploads")
+		log.Println("Restoring uploads")
 		fromEnv := os.Getenv("FROM_ENV")
 		err := restoreUploads(fromEnv, dbName, bucket)
 		if err != nil {
 			panic(err)
 		}
 	}
+
 	log.Println("Done")
 }
