@@ -8,7 +8,7 @@ IMAGE_TAG := latest
 all: test build-image
 
 build:
-	GO111MODULE=on go build -o dyn-dns -v ./
+	GO111MODULE=on go build -o $(APP) -v ./
 
 test:
 	GO111MODULE=on go test -v ./...

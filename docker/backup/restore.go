@@ -4,14 +4,14 @@ import (
 	"bytes"
 	"compress/gzip"
 	"context"
-	"database/sql"
 	"fmt"
+	"io"
 	"log"
+	"os/exec"
 	"strings"
 
 	"cloud.google.com/go/storage"
 	_ "github.com/go-sql-driver/mysql"
-	"github.com/ziutek/mymysql/godrv"
 )
 
 func readToday(bucket, path string) (string, error) {
@@ -19,7 +19,7 @@ func readToday(bucket, path string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	return string(b), nil
+	return strings.TrimSpace(string(b)), nil
 }
 
 func restoreMysql(fromEnv, dbHost, dbName, dbUser, dbPass, bucket, domain string, replaceDomains []string) error {
@@ -41,19 +41,29 @@ func restoreMysql(fromEnv, dbHost, dbName, dbUser, dbPass, bucket, domain string
 		return err
 	}
 
+	log.Println("Replacing strings")
 	sqlstring := string(unzipped)
 	for _, dom := range replaceDomains {
-		log.Println("Replacing", dom, "with", domain)
-		sqlstring = strings.ReplaceAll(sqlstring, dom, domain)
+		if dom != "" && domain != "" {
+			log.Println("Replacing", dom, "with", domain)
+			sqlstring = strings.ReplaceAll(sqlstring, dom, domain)
+		}
 	}
 
-	godrv.Register("SET NAMES utf8")
-	connStr := fmt.Sprintf("%s:%s@tcp(%s:%d)/%s?multiStatements=true", dbName, dbPass, dbHost, 3306, dbName)
-	db, err := sql.Open("mysql", connStr)
-
-	_, err = db.Exec(sqlstring)
+	log.Println("Uploading database")
+	cmd := exec.Command("mysql", "-u", dbUser, "-p"+dbPass, "-h", dbHost, dbName)
+	stdin, err := cmd.StdinPipe()
 	if err != nil {
-		return err
+		panic(err)
+	}
+	go func() {
+		defer stdin.Close()
+		io.WriteString(stdin, sqlstring)
+	}()
+
+	_, err = cmd.CombinedOutput()
+	if err != nil {
+		panic(err)
 	}
 	log.Println("Restored", gcsPath)
 	return nil
