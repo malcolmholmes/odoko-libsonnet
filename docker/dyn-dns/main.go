@@ -3,7 +3,7 @@ package main
 import (
 	"context"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"log"
 	"net/http"
 	"os"
@@ -75,6 +75,7 @@ type Domain struct {
 
 func ifErrorPanic(err error) {
 	if err != nil {
+		log.Printf("ERROR: %v", err)
 		panic(err.Error())
 	}
 }
@@ -160,7 +161,7 @@ func lookupMyIP() (string, error) {
 		return "", err
 	}
 	defer resp.Body.Close()
-	body, err := ioutil.ReadAll(resp.Body)
+	body, err := io.ReadAll(resp.Body)
 	if err != nil {
 		errorsOccurred.With(prometheus.Labels{"type": "lookupMyIP:ReadAll", "domain": ""}).Inc()
 		return "", err
@@ -210,10 +211,13 @@ func lookupIPViaGoogle(services serviceSet, zone, domain string) (string, error)
 }
 
 func getDomains(services serviceSet) (domainSet, error) {
-	ingresses, err := services.k8s.ExtensionsV1beta1().Ingresses("").List(metav1.ListOptions{})
+	ctx := context.Background()
+	ingresses, err := services.k8s.NetworkingV1().Ingresses("").List(ctx, metav1.ListOptions{})
 	if err != nil {
-		errorsOccurred.With(prometheus.Labels{"type": "k8s-list-ingresses", "domain": ""}).Inc()
-		return nil, err
+		if err != nil {
+			errorsOccurred.With(prometheus.Labels{"type": "k8s-list-ingresses", "domain": ""}).Inc()
+			return nil, err
+		}
 	}
 	domains := domainSet{}
 

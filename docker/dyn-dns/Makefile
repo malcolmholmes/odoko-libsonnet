@@ -2,7 +2,7 @@ PHONY: all build test clean build-image push-image
 .DEFAULT_GOAL := all
 
 IMAGE ?= odoko/dyn-dns
-IMAGE_TAG := latest
+IMAGE_TAG := 0.0.2
 
 all: test build-image
 
