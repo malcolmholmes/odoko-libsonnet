@@ -22,8 +22,12 @@ func readToday(bucket, path string) (string, error) {
 }
 
 func restoreMysql(fromEnv, dbHost, dbName, dbUser, dbPass, bucket, domain string, replaceDomains []string) error {
+	if fromEnv == "" {
+		fromEnv = dbName
+	}
 	gcsLatestPath := fmt.Sprintf("backups/%s/db/LATEST", fromEnv)
 	log.Println("Retrieving LATEST from", gcsLatestPath)
+	writeLog(fmt.Sprintf("Retrieving LATEST from %s", gcsLatestPath))
 	latest, err := readToday(bucket, gcsLatestPath)
 	if err != nil {
 		return err
@@ -48,21 +52,24 @@ func restoreMysql(fromEnv, dbHost, dbName, dbUser, dbPass, bucket, domain string
 			sqlstring = strings.ReplaceAll(sqlstring, dom, domain)
 		}
 	}
-
+	writeLog(fmt.Sprintf("SQL bytes: %d", len(sqlstring)))
+	writeLog(fmt.Sprintf("First bytes: %s", string(sqlstring[0:20])))
 	log.Println("Uploading database")
+	writeLog("Uploading database")
 	cmd := exec.Command("mysql", "-u", dbUser, "-p"+dbPass, "-h", dbHost, dbName)
 	stdin, err := cmd.StdinPipe()
 	if err != nil {
-		panic(err)
+		return err
 	}
 	go func() {
 		defer stdin.Close()
 		io.WriteString(stdin, sqlstring)
 	}()
 
-	_, err = cmd.CombinedOutput()
+	out, err := cmd.CombinedOutput()
 	if err != nil {
-		panic(err)
+		writeLog(fmt.Sprintf("CombinedOutput:%s", string(out)))
+		return err
 	}
 	log.Println("Restored", gcsPath)
 	return nil
@@ -101,6 +108,9 @@ func gunzipFile(in []byte) ([]byte, error) {
 }
 
 func restoreUploads(fromEnv, env, bucket string) error {
+	if fromEnv == "" {
+		fromEnv = env
+	}
 	gcsLatestPath := fmt.Sprintf("backups/%s/uploads/LATEST", fromEnv)
 	log.Println("Retrieving LATEST from", gcsLatestPath)
 	latest, err := readToday(bucket, gcsLatestPath)

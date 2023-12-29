@@ -16,8 +16,11 @@ import (
 	"cloud.google.com/go/storage"
 )
 
-func backupMysql(dbHost, dbName, dbUser, dbPass, bucket string) error {
+func backupMysql(domain, dbHost, dbName, dbUser, dbPass, bucket string) error {
 
+	if domain == "" {
+		domain = dbHost
+	}
 	out, err := exec.Command("mysqldump", "-u", dbUser, "-p"+dbPass, "-h", dbHost, dbName).Output()
 	if err != nil {
 		panic(err)
