@@ -124,6 +124,16 @@ func main() {
 				log.Println(err)
 				return
 			}
+			log.Println("Pruning old db backups")
+			err = pruneBackups(bucket, dbName, "db")
+			if err != nil {
+				panic(err)
+			}
+			log.Println("Pruning old upload backups")
+			err = pruneBackups(bucket, dbName, "uploads")
+			if err != nil {
+				panic(err)
+			}
 			log.Println("Complete.")
 		})
 		c.Start()
