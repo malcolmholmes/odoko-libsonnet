@@ -111,38 +111,39 @@ func main() {
 	if contains(cmds, "backup-loop") {
 
 		if strings.HasPrefix(domain, "dev.") {
-			log.Println("Quitting - don't run on dev instances")
-			return
-		}
+			log.Println("Skipping - don't run on dev instances")
 
-		schedule := os.Getenv("SCHEDULE")
-		c := cron.New()
-		c.AddFunc(schedule, func() {
-			log.Println("Backing up db")
-			err := backupMysql(domain, dbHost, dbName, dbUser, dbPass, bucket)
-			if err != nil {
-				log.Println(err)
-				return
-			}
-			log.Println("Backing up uploads")
-			err = backupUploads(dbName, bucket)
-			if err != nil {
-				log.Println(err)
-				return
-			}
-			log.Println("Pruning old db backups")
-			err = pruneBackups(bucket, dbName, "db")
-			if err != nil {
-				panic(err)
-			}
-			log.Println("Pruning old upload backups")
-			err = pruneBackups(bucket, dbName, "uploads")
-			if err != nil {
-				panic(err)
-			}
-			log.Println("Complete.")
-		})
-		c.Start()
+		} else {
+
+			schedule := os.Getenv("SCHEDULE")
+			c := cron.New()
+			c.AddFunc(schedule, func() {
+				log.Println("Backing up db")
+				err := backupMysql(domain, dbHost, dbName, dbUser, dbPass, bucket)
+				if err != nil {
+					log.Println(err)
+					return
+				}
+				log.Println("Backing up uploads")
+				err = backupUploads(dbName, bucket)
+				if err != nil {
+					log.Println(err)
+					return
+				}
+				log.Println("Pruning old db backups")
+				err = pruneBackups(bucket, dbName, "db")
+				if err != nil {
+					panic(err)
+				}
+				log.Println("Pruning old upload backups")
+				err = pruneBackups(bucket, dbName, "uploads")
+				if err != nil {
+					panic(err)
+				}
+				log.Println("Complete.")
+			})
+			c.Start()
+		}
 		for {
 			time.Sleep(1000 * time.Second)
 		}
