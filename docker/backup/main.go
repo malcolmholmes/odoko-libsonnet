@@ -109,6 +109,12 @@ func main() {
 	}
 
 	if contains(cmds, "backup-loop") {
+
+		if strings.HasPrefix(domain, "dev.") {
+			log.Println("Quitting - don't run on dev instances")
+			return
+		}
+
 		schedule := os.Getenv("SCHEDULE")
 		c := cron.New()
 		c.AddFunc(schedule, func() {
